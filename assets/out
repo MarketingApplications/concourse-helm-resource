@@ -31,6 +31,8 @@ wait_until_ready=$(jq -r '.params.wait_until_ready // 0' < $payload)
 debug=$(jq -r '.params.debug // "false"' < $payload)
 replace=$(jq -r '.params.replace // "false"' < $payload)
 delete=$(jq -r '.params.delete // "false"' < $payload)
+rollback=$(jq -r '.params.rollback // "false"' < $payload)
+rollback_revision=$(jq -r '.params.rollback_revision // 0' < $payload)
 test=$(jq -r '.params.test // "false"' < $payload)
 purge=$(jq -r '.params.purge // "false"' < $payload)
 devel=$(jq -r '.params.devel // "false"' < $payload)
@@ -273,8 +275,58 @@ wait_ready_notice() {
   fi
 }
 
+helm_rollback() {
+  if [ -z "$release" ]; then
+    echo "invalid payload (missing release if rollback=true)"
+    exit 1
+  fi
+  rollback_args=("rollback" "--tiller-namespace=$tiller_namespace")
+  if [ "$debug" = true ]; then
+    rollback_args+=("--debug")
+    rollback_dry_run_args+=("--dry-run")
+  fi
+  
+  rollback_args+=("$release")
+  if [ "$rollback_revision" = "0" ]; then
+    previous_revision=`$helm_bin history $release | tail -n 2 | head -n 1 | awk '{print $1}'`
 
-if [ "$delete" = true ]; then
+    if [ -n "$previous_revision" ]; then
+      rollback_revision=$previous_revision
+    fi
+  fi
+  rollback_args+=("$rollback_revision")
+
+  logfile="/tmp/log"
+  mkdir -p /tmp
+
+  if [ "$show_diff" = true ] && current_deployed "$release"> /dev/null && [ "$devel" != true ]; then
+    if [ "$tls_enabled" = true ]; then
+      echo "helm diff does not support TLS at the present moment."
+    else
+      echo "Release diff:"
+      $helm_bin diff "${rollback_args[@]}" | tee "$logfile"
+    fi
+  fi
+
+  echo "Running command helm ${rollback_args[@]} | tee $logfile"
+  if [ "$exit_after_diff" = true ]; then
+    echo "Exiting after diff"
+  else
+    echo "Rollbacking the release $release..."
+    $helm_bin "${rollback_args[@]}" $tls_flag "${rollback_dry_run_args[@]}" | tee $logfile
+  fi
+
+  if [ -n "$wait" ] && [ "$wait" -gt "0" ]; then
+    echo "Waiting for $wait Seconds"
+    sleep $wait
+  fi
+}
+
+if [ "$rollback" = true ]; then
+  helm_rollback
+  result="$(jq -n "{version:{release:\"$release\", rollbackd: \"true\"}, metadata: [{name: \"release\", value: \"$release\"}]}")"
+  echo "$result" | jq -s add  >&3
+elif [ "$delete" = true ]; then
   helm_delete
   result="$(jq -n "{version:{release:\"$release\", deleted: \"true\"}, metadata: [{name: \"release\", value: \"$release\"}]}")"
   echo "$result" | jq -s add  >&3
@@ -297,3 +349,4 @@ else
   result="$(jq -n "{version:{release:\"$release\", revision:\"$revision\"}, metadata: [{name: \"release\", value: \"$release\"},{name: \"revision\", value: \"$revision\"},{name: \"chart\", value: \"$chart\"}]}")"
   echo "$result" | jq -s add  >&3
 fi
+

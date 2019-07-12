@@ -3,7 +3,12 @@
     "cluster_url": "https://my.kubenetes-cluster.test:8443",
     "cluster_ca": "...",
     "admin_key": "...",
-    "admin_cert": "..."
+    "admin_cert": "...",
+    "plugins": [
+      {
+        "url" : "https://hoge",
+        "version": "0.0.1"
+    ]
   },
   "params": {
     "chart": "nginx-0.1.0.tgz",

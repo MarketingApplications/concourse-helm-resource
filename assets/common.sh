@@ -6,9 +6,22 @@ setup_kubernetes() {
   source=$2
 
   mkdir -p /root/.kube
+  gcloud_auth=$(jq -r '.source.gcloud_auth // ""' < $payload)
+
   kubeconfig_path=$(jq -r '.params.kubeconfig_path // ""' < $payload)
   absolute_kubeconfig_path="${source}/${kubeconfig_path}"
-  if [ -f "$absolute_kubeconfig_path" ]; then
+
+	if [ -n "$gcloud_auth" ]; then
+		echo "$gcloud_auth" > gcloud-auth-key.json
+		gcloud_project=$(jq -r '.source.gcloud_project // ""' < $payload)
+		gcloud_cluster=$(jq -r '.source.gcloud_cluster // ""' < $payload)
+		gcloud_zone=$(jq -r '.source.gcloud_zone // ""' < $payload)
+		
+		gcloud --quiet auth activate-service-account --key-file gcloud-auth-key.json
+		gcloud --quiet config set compute/zone $gcloud_zone
+		gcloud --quiet config set container/cluster $gcloud_cluster
+		gcloud --quiet container clusters get-credentials $gcloud_cluster --project $gcloud_project
+  elif [ -f "$absolute_kubeconfig_path" ]; then
     cp "$absolute_kubeconfig_path" "/root/.kube/config"
   else
     # Setup kubectl
@@ -51,6 +64,7 @@ setup_kubernetes() {
     kubectl config use-context default
   fi
 
+  kubectl cluster-info
   kubectl version
 }
 
@@ -207,7 +221,9 @@ setup_repos() {
     tiller_namespace=$(jq -r '.source.tiller_namespace // "kube-system"' < $1)
   fi
 
-  local IFS=$'\n'
+  local IFS_BACKUP=$IFS
+  local IFS_SEPARATOR=$'\n'
+  local IFS=$IFS_SEPARATOR
 
   for pl in $plugins; do
     plurl=$(echo $pl | jq -cr '.url')
@@ -215,7 +231,9 @@ setup_repos() {
     if [ -n "$plversion" ]; then
       plversionflag="--version $plversion"
     fi
+    IFS=$IFS_BACKUP
     helm plugin install $plurl $plversionflag
+    IFS=$IFS_SEPARATOR
   done
 
   for r in $repos; do
