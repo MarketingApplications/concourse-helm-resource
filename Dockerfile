@@ -37,6 +37,7 @@ ADD assets /opt/resource
 RUN chmod +x /opt/resource/*; \
         mkdir -p "$(helm home)/plugins"; \
         helm plugin install https://github.com/databus23/helm-diff \
-        && helm plugin install https://github.com/rimusz/helm-tiller
+        && helm plugin install https://github.com/rimusz/helm-tiller \
+        && helm plugin install https://github.com/futuresimple/helm-secrets
 
 ENTRYPOINT [ "/bin/bash" ]
