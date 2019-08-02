@@ -4,6 +4,7 @@ LABEL maintainer "mario.siegenthaler@linkyard.ch"
 ENV CLOUD_SDK_VERSION 248.0.0
 ENV KUBECTL_VERSION 1.14.2
 ENV HELM_VERSION 2.11.1
+ENV SOPS_VERSION 3.3.1
 ENV GOOGLE_APPLICATION_CREDENTIALS /root/gcloud-auth-key.json
 
 ENV PATH /google-cloud-sdk/bin:$PATH
@@ -38,6 +39,8 @@ RUN chmod +x /opt/resource/*; \
         mkdir -p "$(helm home)/plugins"; \
         helm plugin install https://github.com/databus23/helm-diff \
         && helm plugin install https://github.com/rimusz/helm-tiller \
-        && helm plugin install https://github.com/futuresimple/helm-secrets
+        && helm plugin install https://github.com/futuresimple/helm-secrets --version 2.0.2; \
+        curl -s -L -o /usr/local/bin/sops https://github.com/mozilla/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux \
+        && chmod +x /usr/local/bin/sops
 
 ENTRYPOINT [ "/bin/bash" ]

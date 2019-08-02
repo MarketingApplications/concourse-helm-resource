@@ -127,13 +127,10 @@ setup_helm() {
   tls_enabled=$(jq -r '.source.tls_enabled // "false"' < $payload)
   history_max=$(jq -r '.source.helm_history_max // "0"' < $1)
   stable_repo=$(jq -r '.source.stable_repo // ""' < $payload)
-  secrets=$(jq -r '.source.secrets // "false"' < $payload)
 
   if [ "$tillerless" = true ]; then
     echo "Using tillerless helm"
     helm_bin="helm tiller run ${tiller_namespace} -- helm"
-  elif [ "$secrets" = true ]; then
-    helm_bin="helm secrets"
   else
     helm_bin="helm"
   fi
