@@ -1,13 +1,17 @@
-FROM linkyard/docker-helm:2.14.1
+FROM linkyard/docker-helm:2.14.1 as docker-helm
 LABEL maintainer "mario.siegenthaler@linkyard.ch"
 
-ENV CLOUD_SDK_VERSION 248.0.0
-ENV KUBECTL_VERSION 1.14.2
-ENV HELM_VERSION 2.11.1
-ENV SOPS_VERSION 3.3.1
-ENV GOOGLE_APPLICATION_CREDENTIALS /root/gcloud-auth-key.json
+FROM google/cloud-sdk:276.0.0-alpine
 
-ENV PATH /google-cloud-sdk/bin:$PATH
+COPY --from=docker-helm /bin/helm /bin/helm
+
+ENV KUBECTL_VERSION="1.14.2" \
+    HELM_VERSION="2.14.1" \
+    SOPS_VERSION="3.3.1" \
+    HELM_GCS_VERSION="0.2.1" \
+    GOOGLE_APPLICATION_CREDENTIALS="/root/gcloud-auth-key.json"
+
+ADD assets /opt/resource
 
 RUN apk --no-cache add \
         curl \
@@ -20,26 +24,15 @@ RUN apk --no-cache add \
         tar \
         jq \
         ca-certificates \
-        && rm -rf /var/cache/apk/*
-
-RUN curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${CLOUD_SDK_VERSION}-linux-x86_64.tar.gz \
-        && tar xzf google-cloud-sdk-${CLOUD_SDK_VERSION}-linux-x86_64.tar.gz \
-        && rm google-cloud-sdk-${CLOUD_SDK_VERSION}-linux-x86_64.tar.gz \
-        && ln -s /lib /lib64 \
-        && gcloud config set core/disable_usage_reporting true \
-        && gcloud config set component_manager/disable_update_check true \
-        && gcloud --version \
-        && gcloud components install alpha beta \
-        && gcloud components update; \
-        curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl \
-        && chmod +x /usr/bin/kubectl
-
-ADD assets /opt/resource
-RUN chmod +x /opt/resource/*; \
+        && rm -rf /var/cache/apk/*; \
+    curl -L -o /usr/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl \
+        && chmod +x /usr/bin/kubectl; \
+    chmod +x /opt/resource/*; \
         mkdir -p "$(helm home)/plugins"; \
         helm plugin install https://github.com/databus23/helm-diff \
         && helm plugin install https://github.com/rimusz/helm-tiller \
-        && helm plugin install https://github.com/futuresimple/helm-secrets --version 2.0.2; \
+        && helm plugin install https://github.com/futuresimple/helm-secrets --version 2.0.2 \
+        && helm plugin install https://github.com/hayorov/helm-gcs --version 0.2.1; \
         curl -s -L -o /usr/local/bin/sops https://github.com/mozilla/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux \
         && chmod +x /usr/local/bin/sops
 

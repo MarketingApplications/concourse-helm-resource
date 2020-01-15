@@ -64,7 +64,6 @@ setup_kubernetes() {
     kubectl config use-context default
   fi
 
-  kubectl cluster-info
   kubectl version
 }
 
